@@ -20,7 +20,6 @@ All demo pages are self-contained static HTML files — no build step. Browser d
 | Document Q&A | [docs.html](docs.html) | WebLLM (MLC) + WebGPU, in-browser | Paste plain text, get a grounded summary + sourced Q&A (no PDF upload) |
 | Local Translation | [translation-local.html](translation-local.html) | LM Studio (local server) | Hits `http://localhost:1234` with Sarvam-Translate — start LM Studio's server with CORS enabled first |
 
-`vision.html` also exists in this repo but is **not** part of the current talk flow (the vision demo was cut) — left in place in case it's useful for a future in-person session.
 
 ## Sample data
 
