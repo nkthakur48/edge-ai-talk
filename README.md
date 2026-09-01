@@ -24,7 +24,6 @@ All demo pages are self-contained static HTML files — no build step. Browser d
 
 ## Other files
 
-- `slides-outline.md`, `talk-structure.md`, `image-prompts.md` — planning notes behind the deck; not needed to run anything.
 - `images/` — screenshots and illustrations used by `slides.html`.
 
 ## Running locally
