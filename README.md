@@ -2,6 +2,10 @@
 
 Slides and live demos for a Faculty Development Programme talk on running AI models fully offline — first in the browser (WebGPU + WebLLM/MLC), then on the full machine (LM Studio). No API keys, no cloud, no network calls during inference.
 
+## Landing page
+
+- **[index.html](index.html)** — start here. Links to the slides and every live demo below.
+
 ## Slides
 
 - **[slides.html](slides.html)** — the reveal.js deck. Open directly in a browser, or serve locally (`npx serve` / `python3 -m http.server`) for the best experience.
@@ -34,4 +38,4 @@ Most of these are plain static files, but serve them over HTTP (not `file://`) s
 npx serve .
 ```
 
-Then open `http://localhost:3000/slides.html` (or whichever port `serve` reports).
+Then open `http://localhost:3000/` (or whichever port `serve` reports) to land on `index.html`.
