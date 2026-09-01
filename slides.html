@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Edge AI: Unleashed On-Device Intelligence</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+<style>
+  :root{ --accent:#2563eb; --dim:#6b7280; }
+  .reveal h1, .reveal h2, .reveal h3 { text-transform:none; letter-spacing:0; }
+  .reveal h1 { font-size:2.0em; }
+  .reveal h2 { font-size:1.5em; color:var(--accent); }
+  .reveal section.act h2 { font-size:1.6em; text-align:center; white-space:nowrap; }
+  .reveal section.act p.sub { text-align:center; color:var(--dim); font-size:0.7em; }
+  .reveal .subtitle { color:var(--dim); font-size:0.6em; }
+  .reveal .cue { color:var(--dim); font-size:0.55em; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.3em; }
+  .reveal .big { font-size:2.2em; font-weight:600; }
+  .reveal .huge { font-size:3.2em; font-weight:700; color:#dc2626; }
+
+  .diagram { display:flex; align-items:center; justify-content:center; gap:0.4em; flex-wrap:wrap; margin:1em 0; }
+  .diagram .box { border:2px solid var(--accent); border-radius:10px; padding:0.5em 0.8em; font-size:0.6em; font-weight:600; background:#eff6ff; }
+  .diagram .arrow { font-size:1.2em; color:var(--dim); }
+  .diagram.stack { flex-direction:column; }
+  .diagram.stack .arrow { transform:rotate(90deg); }
+
+  .cards { display:flex; gap:1.2em; justify-content:center; height:504px; margin-top:1em; }
+  .card { border:1px solid #d1d5db; border-radius:16px; padding:1.6em 1.2em; font-size:0.6em; text-align:center; flex:1; background:#f9fafb; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .card img { width:130px; height:130px; object-fit:contain; margin-bottom:1.2em; }
+  .card h4 { margin:0 0 0.6em 0; color:var(--accent); font-size:1.25em; }
+  .card p { margin:0; line-height:1.5; color:var(--dim); font-size:1em; }
+
+  .numbers { display:flex; gap:1.2em; justify-content:center; margin-top:0.6em; }
+  .numbers .stat { text-align:center; }
+  .numbers .stat .n { font-size:1.6em; font-weight:700; color:var(--accent); }
+  .numbers .stat .l { font-size:0.5em; color:var(--dim); }
+
+  .reveal ul { font-size:0.75em; }
+  .reveal section { text-align:left; }
+  .reveal section.center, .reveal section.act { text-align:center; }
+
+  /* full-bleed illustration backgrounds: reveal's data-background-image lives in a separate
+     unscaled full-viewport layer, so it only lines up with in-slide text when the window is
+     exactly 16:9 — using a plain <img> instead keeps image and text overlay in the same
+     scaled/letterboxed coordinate system at any window size. */
+  /* height only — no position:relative here: reveal already makes the present slide
+     position:absolute, which is a valid containing block; overriding it to `relative`
+     keeps past .bg slides in normal document flow and pushes every later slide down. */
+  .reveal .slides>section.bg { height:100%; }
+  .reveal section.bg > img.bg-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; margin:0; max-width:none; max-height:none; }
+  .reveal section.bg .overlay-wrap { position:absolute; inset:0; box-sizing:border-box; display:flex; flex-direction:column; justify-content:space-between; padding:6%; text-align:center; z-index:1; }
+  .reveal section.bg .overlay-wrap * { text-align:center; margin:0; }
+  .reveal section.bg .overlay-wrap .cue { margin-bottom:0.3em; }
+  .reveal section.bg .overlay-wrap h1 + *, .reveal section.bg .overlay-wrap h2 + *, .reveal section.bg .overlay-wrap .huge + * { margin-top:0.3em; }
+
+  /* icon-row banner images — specificity must beat reveal's default ".reveal img{margin:...0}" */
+  .reveal section img.icon-row { width:78%; display:block; margin:0.8em auto 0.4em; }
+  .caption-row { position:relative; width:78%; height:1.4em; margin:0 auto; }
+  .caption-row span { position:absolute; top:0; transform:translateX(-50%); text-align:center; font-size:0.55em; font-weight:600; color:var(--dim); white-space:nowrap; }
+
+  .reveal section img.icon-solo { width:150px; display:block; margin:0.6em auto; }
+
+  .bio { display:flex; gap:2em; align-items:center; margin-top:0.8em; }
+  .bio-photo { width:200px; border-radius:16px; border:2px solid #e5e7eb; display:block; }
+  .bio-qr { width:110px; height:110px; margin-top:0.8em; border:1px solid #e5e7eb; border-radius:8px; padding:6px; background:#fff; }
+  .bio-col { flex:1; }
+  .bio-col .name { font-size:1.3em; font-weight:700; margin:0; }
+  .bio-col .role { color:var(--dim); font-size:0.6em; margin:0.2em 0 0; }
+  .bio-col .link { font-size:0.6em; margin:0.3em 0 0; }
+  .bio-col .link a { color:var(--accent); text-decoration:none; }
+  .badges { margin-top:0.8em; }
+  .badge { display:inline-block; border:1px solid #dbeafe; background:#eff6ff; color:var(--accent); font-size:0.5em; font-weight:600; padding:0.3em 0.7em; border-radius:999px; margin:0.2em 0.3em 0.2em 0; }
+  .bio-col .tag { font-size:0.55em; color:var(--dim); margin-top:0.8em; line-height:1.6; }
+
+  @keyframes blink { 0%, 100% { opacity:1; } 50% { opacity:0.5; } }
+  .pill-blink { animation: blink 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- 1 -->
+<section class="bg">
+  <img class="bg-img" src="images/01-title.png" alt="">
+  <div class="overlay-wrap">
+    <div>
+      <h1>Edge AI</h1>
+      <h3 class="subtitle">Unleashed: On-Device Intelligence</h3>
+    </div>
+  </div>
+  <aside class="notes">Welcome, introduce yourself briefly. Energy: warm, curious, not salesy.</aside>
+</section>
+
+<!-- 2 -->
+<section>
+  <h2>Who am I</h2>
+  <div class="bio">
+    <div style="text-align:center">
+      <img class="bio-photo" src="images/speaker-nishant.jpg" alt="Nishant Thakur">
+      <img class="bio-qr" src="images/speaker-qr-linkedin.png" alt="LinkedIn QR">
+    </div>
+    <div class="bio-col">
+      <p class="name">Nishant Thakur</p>
+      <p class="role">Adobe &middot; Bengaluru &middot; 15 years in tech</p>
+      <p class="link">linkedin.com/in/nishantkthakur</p>
+      <p class="link">github.com/nkthakur48</p>
+      <div class="badges">
+        <span class="badge">Full-Stack + AI</span>
+        <span class="badge">MS Data Science</span>
+      </div>
+      <p class="tag">Curious builder<br>Believes in eternal learning</p>
+    </div>
+  </div>
+  <aside class="notes">Quick self-intro, keep it under a minute — the room came for the demos.</aside>
+</section>
+
+<!-- 3 -->
+<section>
+  <div class="cue">Live walkthrough</div>
+  <p class="big">Every AI demo you've seen<br>had an API key behind it.</p>
+  <p>This one won't.</p>
+  <a href="https://openai.com/api/pricing/" target="_blank" rel="noopener noreferrer">
+    <img class="icon-row" src="images/demo-cloud-hook.png" alt="OpenAI API per-token pricing" style="width:80%;border:1px solid #e5e7eb;border-radius:10px;">
+  </a>
+  <p class="subtitle" style="text-align:center">openai.com/api/pricing</p>
+  <aside class="notes">
+    Go to ChatGPT or any cloud API live. Show sign-up, API key, rate limit warning, pricing page. Don't mock it — show it plainly. Engineering faculty feel lab-budget/student-access friction immediately. ~5 min.
+  </aside>
+</section>
+
+<!-- 4 -->
+<section class="center">
+  <p class="big">What if none of this<br>was necessary?</p>
+  <aside class="notes">Pause after this line. Let it hang for a beat before closing the laptop lid.</aside>
+</section>
+
+<!-- 5 -->
+<section class="bg">
+  <img class="bg-img" src="images/04-offline.png" alt="">
+  <div class="overlay-wrap">
+    <div>
+      <p class="huge" style="font-size:2.2em">No Internet</p>
+    </div>
+    <p class="subtitle">Everything from here runs entirely on your machine</p>
+  </div>
+  <aside class="notes">Remote session — can't cut WiFi live. Say it instead: everything from here on runs fully offline, no network calls, verified beforehand.</aside>
+</section>
+
+<!-- 6 -->
+<section>
+  <h2>Three shifts made this practical</h2>
+  <img class="icon-row" src="images/05-three-shifts.png" alt="Quantization, WebGPU, Hardware">
+  <div class="caption-row">
+    <span style="left:19.7%">Quantization</span><span style="left:50%">WebGPU</span><span style="left:80.5%">Hardware</span>
+  </div>
+  <aside class="notes">5–10 min mark. Models got smaller (quantization), browsers got GPU access (WebGPU), hardware caught up (Apple Silicon, modern GPUs). Keep brief, one sentence each.</aside>
+</section>
+
+<!-- 7 -->
+<section>
+  <h2>Today's spectrum</h2>
+  <div class="diagram">
+    <div class="box">Cloud API</div><div class="arrow">&rarr;</div>
+    <div class="box">On-Device<br>(Laptop/Phone)</div><div class="arrow">&rarr;</div>
+    <div class="box">In-Browser</div>
+  </div>
+  <p class="subtitle" style="text-align:center">We work this spectrum right to left. Everything stays on this machine.</p>
+  <div class="numbers">
+    <div class="stat"><div class="n">$$$</div><div class="l">per-token cost</div></div>
+    <div class="stat"><div class="n">100&ndash;500ms</div><div class="l">network round-trip</div></div>
+    <div class="stat"><div class="n">$0</div><div class="l">on-device, offline</div></div>
+  </div>
+  <aside class="notes">Hold this diagram on screen for 30 seconds. Start in the most constrained environment — a browser tab — and expand from there.</aside>
+</section>
+
+<!-- 8 -->
+<section>
+  <h2>What Edge AI solves</h2>
+  <img class="icon-row" src="images/07-edge-ai-solves.png" alt="Privacy, Cost, Latency">
+  <div class="caption-row">
+    <span style="left:20.3%">Privacy</span><span style="left:50%">Cost</span><span style="left:79.5%">Latency</span>
+  </div>
+  <aside class="notes">10–14 min mark. Privacy: sensitive data never leaves the device. Cost: no per-token billing for a class of 60. Latency: no round-trip to a data center. Frame in constraints/cost/performance terms.</aside>
+</section>
+
+<!-- 9 -->
+<section class="bg act">
+  <img class="bg-img" src="images/08-act2-divider.png" alt="">
+  <div class="overlay-wrap">
+    <div>
+      <h2>Phase 1 &mdash; AI in the Browser</h2>
+    </div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section>
+  <div class="cue">Demo 1 &middot; Live</div>
+  <h2>Translation</h2>
+  <a href="translation.html" target="_blank" rel="noopener noreferrer">
+    <img class="icon-row" src="images/demo-translation.png" alt="Translation demo: English to Tamil via Qwen3-4B" style="width:80%;border:1px solid #e5e7eb;border-radius:10px;">
+  </a>
+  <p class="subtitle">WebLLM (MLC) + WebGPU &middot; Qwen3 (better multilingual coverage)</p>
+  <aside class="notes">
+    Ask a faculty member for a sentence from their domain — a line from a paper, a definition from their syllabus. Translate it live. Let a language-adjacent faculty member judge quality.
+    Point at the GPU usage climbing in Activity Monitor/htop as it generates — that's the proof, not a network log. First proof moment.
+    Reframe (casual, one sentence): "This 4-billion-parameter model runs entirely in this browser tab — no server, no API key."
+  </aside>
+</section>
+
+<!-- 11 -->
+<section>
+  <div class="cue">Demo 2 &middot; Live</div>
+  <h2>Document Understanding</h2>
+  <a href="docs.html" target="_blank" rel="noopener noreferrer">
+    <img class="icon-row" src="images/demo-docs.png" alt="Grounded document Q&amp;A demo with summary and sourced answer" style="width:80%;border:1px solid #e5e7eb;border-radius:10px;">
+  </a>
+  <p class="subtitle">Paste text, ask questions, grounded answers &middot; Qwen3-4B / Gemma-2-2B</p>
+  <aside class="notes">
+    Paste in a syllabus excerpt or paper abstract (plain/rich text, no PDF upload). Ask a question a faculty member suggests, then ask one the document can't answer — the model should refuse rather than guess, and every real answer ends with a quoted source line pulled straight from the pasted text.
+    This is the demo that hits faculty hardest — private, free, grounded, all local. No reframe needed, the use case already speaks to the thesis.
+  </aside>
+</section>
+
+<!-- 12 -->
+<section>
+  <h2>Under the hood: browser as edge runtime</h2>
+  <div class="diagram">
+    <div class="box">Browser</div><div class="arrow">&rarr;</div>
+    <div class="box">WebGPU</div><div class="arrow">&rarr;</div>
+    <div class="box">WebLLM (MLC)</div><div class="arrow">&rarr;</div>
+    <div class="box">Quantized Model<br>(INT4/INT8)</div>
+  </div>
+  <div class="numbers">
+    <div class="stat"><div class="n">2.3GB</div><div class="l">Qwen3-4B</div></div>
+    <div class="stat"><div class="n">1.4GB</div><div class="l">Gemma-2-2B</div></div>
+  </div>
+  <p class="subtitle" style="text-align:center">"The browser is the most widely deployed edge runtime in the world. Every student already has it."</p>
+  <aside class="notes">Show actual model files and sizes. Show memory consumption in the browser task manager. Quick mention of tradeoffs — what fits in a browser, what doesn't, where the ceiling is. 35–40 min mark, intentional energy dip.</aside>
+</section>
+
+<!-- 13 -->
+<section class="center">
+  <div class="cue">Audience pulse</div>
+  <img class="icon-solo" src="images/13-pulse-check.png" alt="raised hand">
+  <p class="big">Who's run an AI model locally?</p>
+  <p class="subtitle">By the end of this talk, you'll know how in under five minutes.</p>
+  <aside class="notes">40–45 min. Usually very few hands. Take 2–3 quick questions, max 5 minutes. Let them process Act 2 before Act 3 changes the game.</aside>
+</section>
+
+<!-- 14 -->
+<section class="bg act">
+  <img class="bg-img" src="images/14-act3-divider.png" alt="">
+  <div class="overlay-wrap">
+    <div>
+      <h2>Phase 2 &mdash; Full-Device Inference</h2>
+    </div>
+    <p class="subtitle">Your laptop has a lot more power than a browser tab is allowed to use. Let's unlock it.</p>
+  </div>
+</section>
+
+<!-- 15 -->
+<section>
+  <div class="cue">Demo 3 &middot; Live</div>
+  <h2>Local Text AI with LM Studio</h2>
+  <img class="icon-row" src="images/demo-lmstudio.png" alt="LM Studio serving Sarvam-Translate locally" style="width:80%;border:1px solid #e5e7eb;border-radius:10px;">
+  <p class="subtitle">LM Studio &middot; general chat, then a grounded Tamil translation comparison</p>
+  <aside class="notes">
+    Open LM Studio's own chat UI, load a general-purpose model, take a few live questions from the audience — this is where extra time goes, plan for it. Show GPU usage climbing in Activity Monitor/htop as it generates.
+    Then reopen translation-local.html (LM Studio serving Sarvam-Translate, a Gemma3-4B model fine-tuned for Indic translation) and replay the same Tamil sentence from Demo 1. Quality jump vs. the browser's Qwen3-4B should be obvious — makes the point that more headroom on the laptop buys real quality, not just bigger numbers.
+    Ecosystem (30 sec): LM Studio, Ollama, llama.cpp, MLX on Apple Silicon. The point isn't which tool — it's that the capability now lives on the device.
+    Confirm LM Studio's local server is running with CORS enabled (needed for the translation-local.html handoff) before going on stage.
+  </aside>
+</section>
+
+<!-- 16 -->
+<section>
+  <h2>Under the hood: the on-device AI stack</h2>
+  <div class="diagram">
+    <div class="box">LM Studio</div><div class="arrow">&rarr;</div>
+    <div class="box">GGUF Quantized Model</div><div class="arrow">&rarr;</div>
+    <div class="box">llama.cpp Runtime<br>(MLX on Apple Silicon)</div><div class="arrow">&rarr;</div>
+    <div class="box">CPU/GPU Inference</div>
+  </div>
+  <p class="subtitle" style="text-align:center">"16GB RAM runs a 7B model comfortably. 32GB handles 13B with patience. 70B needs more RAM than most laptops have."</p>
+  <aside class="notes">Key numbers: model sizes (2GB/4GB/8GB), RAM requirements, tokens/sec. Intentional energy dip here. Be honest about what doesn't work well locally yet — very large models, real-time video generation, training.</aside>
+</section>
+
+<!-- 17 -->
+<section>
+  <h2>This transfers directly</h2>
+  <img class="icon-row" src="images/18-this-transfers.png" alt="Laptop, Workstation, Jetson/Pi, Phone">
+  <div class="caption-row">
+    <span style="left:19.0%">Laptop</span><span style="left:45.3%">Workstation</span><span style="left:68.5%">Jetson / Pi</span><span style="left:89.0%">Phone</span>
+  </div>
+  <p class="subtitle" style="text-align:center">Same quantization formats (GGUF, INT4, INT8) across devices — the skill you learn here transfers to embedded and mobile deployment.</p>
+  <aside class="notes">Edge deployment bridge, ~2 minutes. Keep it brief, this is a bridge sentence not a new topic. Be honest about the ceiling — large models, real-time video, training.</aside>
+</section>
+
+<!-- 18 -->
+<section class="center">
+  <div class="cue">Recap</div>
+  <p class="huge">Zero API calls.</p>
+  <p class="subtitle">Every AI moment in this session ran on local compute — the GPU usage you saw is the proof, not a network log.</p>
+  <aside class="notes">This is an online session, so network traffic isn't literally zero — the video call itself uses it. The point is that none of it was AI inference. Recap the GPU usage shown during the demos (Activity Monitor / htop / LM Studio) as the actual evidence, rather than a continuous network monitor overlay. Pause here. Let it land.</aside>
+</section>
+
+<!-- 19 -->
+<section class="bg act">
+  <img class="bg-img" src="images/21-act4-divider.png" alt="">
+  <div class="overlay-wrap">
+    <div>
+      <h2>Phase 3 &mdash; Edge AI in Your Classroom</h2>
+    </div>
+  </div>
+</section>
+
+<!-- 20 -->
+<section>
+  <h2>What's Next</h2>
+  <div class="cards">
+    <div class="card fragment"><img src="images/22-branch-cs.png" alt="CS/IT"><h4>CS / IT</h4><p>Browser-based translation and document Q&amp;A tools running entirely in Chrome — no server, no Docker.</p></div>
+    <div class="card fragment"><img src="images/22-branch-ece.png" alt="ECE"><h4>Electronics / ECE</h4><p>Grounded Q&amp;A over datasheets and manuals, running locally via Ollama on a Jetson Nano or Raspberry Pi.</p></div>
+    <div class="card fragment"><img src="images/22-branch-mech.png" alt="Mechanical/Civil"><h4>Mechanical / Civil</h4><p>Multilingual safety manuals and specs translated on-site, no cell coverage needed.</p></div>
+    <div class="card fragment"><img src="images/22-branch-research.png" alt="Research"><h4>Research / Any Dept</h4><p>Sensitive data never leaves the lab machine — no IRB concerns.</p></div>
+  </div>
+  <aside class="notes">
+    Pose these, let faculty connect it to their own department. Advance one card at a time.
+    CS/IT: browser-based translation and document Q&A, entirely in Chrome — no server, no Docker, no cloud credits.
+    ECE: grounded Q&A over datasheets/manuals via Ollama on a Jetson Nano or Raspberry Pi — same local-inference principle we used today, on cheaper/smaller hardware (LM Studio needs more RAM/GPU than these boards have; Ollama is what's actually documented running on them).
+    Mech/Civil: multilingual safety manuals and specs translated on-site, no cell coverage needed.
+    Research: sensitive data never leaves the lab machine — no IRB concerns, no data-sharing agreements.
+  </aside>
+</section>
+
+<!-- 21 -->
+<section>
+  <h2>The five-minute setup</h2>
+  <img class="icon-row" src="images/23-five-minute-setup.png" alt="Install, Download, Ask">
+  <div class="caption-row">
+    <span style="left:19.3%">Install</span><span style="left:50%">Download</span><span style="left:80.6%">Ask</span>
+  </div>
+  <aside class="notes">Live on screen: install LM Studio, download a model, ask a question. Show it takes under two minutes.</aside>
+</section>
+
+<!-- 22 -->
+<section class="center">
+  <h2>Resources + What's Next</h2>
+  <div style="display:flex;gap:2em;max-width:960px;margin:0.8em auto 0;text-align:left;">
+    <div style="flex:1;font-size:0.58em;">
+      <div style="display:flex;justify-content:space-between;gap:1em;padding:0.45em 0;border-bottom:1px solid #e5e7eb;"><strong>WebLLM docs</strong><span style="color:var(--dim)">github.com/mlc-ai/web-llm</span></div>
+      <div style="display:flex;justify-content:space-between;gap:1em;padding:0.45em 0;border-bottom:1px solid #e5e7eb;"><strong>Gemma 2 2B</strong><span style="color:var(--dim)">huggingface.co/google/gemma-2-2b-it</span></div>
+      <div style="display:flex;justify-content:space-between;gap:1em;padding:0.45em 0;border-bottom:1px solid #e5e7eb;"><strong>Qwen3-4B</strong><span style="color:var(--dim)">huggingface.co/Qwen/Qwen3-4B</span></div>
+      <div style="display:flex;justify-content:space-between;gap:1em;padding:0.45em 0;border-bottom:1px solid #e5e7eb;"><strong>LM Studio</strong><span style="color:var(--dim)">lmstudio.ai</span></div>
+      <div style="display:flex;justify-content:space-between;gap:1em;padding:0.45em 0;border-bottom:1px solid #e5e7eb;"><strong>Sarvam-Translate model</strong><span style="color:var(--dim)">huggingface.co/sarvamai/sarvam-translate</span></div>
+      <div style="display:flex;justify-content:space-between;gap:1em;padding:0.45em 0;">&#128230; <strong>All code</strong><span style="color:var(--dim)">github.com/nkthakur48/edge-ai-talk</span></div>
+    </div>
+    <div style="flex:1;">
+      <p style="font-size:0.55em;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4em;">Papers</p>
+      <div style="font-size:0.52em;line-height:1.4;">
+        <div style="padding:0.35em 0;border-bottom:1px solid #e5e7eb;"><div style="color:#111827;font-weight:600;">WebLLM: A High-Performance In-Browser LLM Inference Engine</div><div style="color:var(--dim);margin-top:0.15em;">arxiv.org/abs/2412.15803</div></div>
+        <div style="padding:0.35em 0;border-bottom:1px solid #e5e7eb;"><div style="color:#111827;font-weight:600;">Gemma 2: Improving Open Language Models at a Practical Size</div><div style="color:var(--dim);margin-top:0.15em;">arxiv.org/abs/2408.00118</div></div>
+        <div style="padding:0.35em 0;border-bottom:1px solid #e5e7eb;"><div style="color:#111827;font-weight:600;">Qwen3 Technical Report</div><div style="color:var(--dim);margin-top:0.15em;">arxiv.org/abs/2505.09388</div></div>
+        <div style="padding:0.35em 0;border-bottom:1px solid #e5e7eb;"><div style="color:#111827;font-weight:600;">Characterizing WebGPU Dispatch Overhead for LLM Inference</div><div style="color:var(--dim);margin-top:0.15em;">arxiv.org/abs/2604.02344</div></div>
+        <div style="padding:0.35em 0;"><div style="color:#111827;font-weight:600;">A Comprehensive Study on Quantization Techniques for LLMs</div><div style="color:var(--dim);margin-top:0.15em;">arxiv.org/abs/2411.02530</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 23 -->
+<section class="bg">
+  <img class="bg-img" src="images/25-closing.png" alt="">
+  <div class="overlay-wrap">
+    <span class="pill-blink" style="position:absolute;top:6%;right:2%;background:rgba(255,255,255,0.92);color:var(--accent);font-size:0.5em;font-weight:600;padding:0.4em 1.1em;border-radius:999px;z-index:2;">Open to Q&amp;A</span>
+    <div>
+      <p class="big" style="font-size:1.1em">Free. Offline.<br>Already yours.</p>
+    </div>
+  </div>
+  <aside class="notes">
+    "The only thing between you and all of this is about five minutes of setup." Open the floor for Q&A here.
+    Prepared answers to have ready:
+    - GPU vs CPU performance — have benchmarks ready.
+    - Can students run this on Windows? Yes, with caveats — know them.
+    - Quality vs GPT-4/Claude? Be honest, show the tradeoff curve.
+    - Fine-tuning on our own data? Briefly mention LoRA, point to resources.
+    - Models for my specific domain? Have 2–3 domain-specific recommendations ready.
+    - vs TensorFlow Lite / TFLite? Know the answer.
+    - Microcontrollers (ESP32, Arduino)? TinyML is related but different — mention TFLite Micro.
+    - NVIDIA Jetson? Yes, Ollama and llama.cpp both run on Jetson.
+    - Production-ready or just demos? Be honest about the maturity curve.
+    - Final-year project ideas? Have 2–3 ready.
+  </aside>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    controls: true,
+    progress: true,
+    center: false,
+    transition: 'slide',
+    width: 1280,
+    height: 720
+  });
+</script>
+</body>
+</html>

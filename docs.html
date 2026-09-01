@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Document Q&amp;A Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --accent:#2563eb; --dim:#6b7280; --border:#e5e7eb; }
+  * { box-sizing:border-box; }
+  body { font-family:system-ui, -apple-system, sans-serif; background:#f9fafb; margin:0; padding:2rem; color:#111827; }
+  .wrap { max-width:900px; margin:0 auto; }
+  .header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; gap:1rem; }
+  h1 { font-size:1.4rem; margin:0; }
+  #model-select { font-size:0.8rem; padding:0.35rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:white; }
+  #model-select:disabled { opacity:0.5; }
+
+  #loading { text-align:center; padding:3rem 1rem; }
+  #loading h2 { font-size:1.1rem; margin-bottom:0.8rem; color:var(--dim); }
+  .progress-bar { width:320px; max-width:100%; height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin:0 auto 0.8rem; }
+  .progress-fill { height:100%; width:0%; background:var(--accent); transition:width 0.3s; }
+  #loading-status { font-size:0.85rem; color:var(--dim); }
+
+  #app { display:none; }
+  .pane { border:1px solid var(--border); border-radius:10px; background:white; padding:1rem; margin-bottom:1rem; }
+  .pane label { display:block; font-size:0.75rem; font-weight:600; color:var(--dim); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.5rem; }
+  #corpus { width:100%; min-height:160px; font-size:0.9rem; line-height:1.5; border:none; resize:vertical; outline:none; font-family:inherit; margin-bottom:0.4rem; }
+  #corpus-warning { display:none; font-size:0.8rem; color:#dc2626; margin-bottom:0.6rem; }
+
+  #summarize-btn { padding:0.5rem 1.1rem; font-size:0.85rem; font-weight:600; background:white; color:var(--accent); border:1px solid var(--accent); border-radius:8px; cursor:pointer; }
+  #summarize-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  #summary-wrap { display:none; margin-top:0.8rem; padding-top:0.8rem; border-top:1px solid var(--border); }
+  #summary { font-size:0.88rem; line-height:1.5; white-space:pre-wrap; color:#374151; }
+
+  .ask-row { display:flex; gap:0.6rem; margin-bottom:1rem; }
+  #question { flex:1; padding:0.6rem 0.8rem; font-size:0.95rem; border:1px solid var(--border); border-radius:8px; font-family:inherit; }
+  #ask-btn { padding:0.6rem 1.4rem; font-size:0.95rem; font-weight:600; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; }
+  #ask-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  #think-details { display:none; margin-bottom:0.6rem; border:1px solid var(--border); border-radius:6px; background:#f9fafb; }
+  #think-details summary { padding:0.4rem 0.6rem; font-size:0.8rem; color:var(--dim); cursor:pointer; }
+  #think-content { padding:0 0.6rem 0.6rem; font-size:0.8rem; color:var(--dim); white-space:pre-wrap; max-height:200px; overflow-y:auto; }
+
+  #answer { min-height:80px; font-size:0.95rem; line-height:1.6; white-space:pre-wrap; }
+  #answer:empty::before { content:"Answer appears here..."; color:var(--dim); }
+  #answer .source-line { display:block; margin-top:0.6rem; font-size:0.82rem; color:var(--dim); font-style:italic; }
+
+  #status { font-size:0.85rem; color:var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <h1>Document Q&amp;A &middot; WebLLM (MLC) + WebGPU</h1>
+    <select id="model-select">
+      <option value="Qwen3-4B-q4f16_1-MLC" selected>Qwen3-4B (multilingual)</option>
+      <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma-2-2B (default)</option>
+    </select>
+  </div>
+
+  <div id="loading">
+    <h2 id="loading-title">Loading model...</h2>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+    <div id="loading-status">Initializing...</div>
+  </div>
+
+  <div id="app">
+    <div class="pane">
+      <label for="corpus">Document (paste text — no PDF upload, plain/rich text only)</label>
+      <textarea id="corpus" placeholder="Paste an article, syllabus excerpt, or reading assignment here..."></textarea>
+      <div id="corpus-warning"></div>
+      <button id="summarize-btn" disabled>Summarize</button>
+      <div id="summary-wrap">
+        <label for="summary">Summary</label>
+        <div id="summary"></div>
+      </div>
+    </div>
+
+    <div class="ask-row">
+      <input type="text" id="question" placeholder="Ask a question about the document above..." disabled>
+      <button id="ask-btn" disabled>Ask</button>
+    </div>
+
+    <div class="pane">
+      <details id="think-details">
+        <summary>Model reasoning (click to expand)</summary>
+        <div id="think-content"></div>
+      </details>
+      <div id="answer"></div>
+      <span id="status"></span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+
+  const loadingEl = document.getElementById("loading");
+  const loadingTitleEl = document.getElementById("loading-title");
+  const appEl = document.getElementById("app");
+  const progressEl = document.getElementById("progress");
+  const loadingStatus = document.getElementById("loading-status");
+  const modelSelectEl = document.getElementById("model-select");
+  const corpusEl = document.getElementById("corpus");
+  const corpusWarningEl = document.getElementById("corpus-warning");
+  const summarizeBtn = document.getElementById("summarize-btn");
+  const summaryWrapEl = document.getElementById("summary-wrap");
+  const summaryEl = document.getElementById("summary");
+  const questionEl = document.getElementById("question");
+  const askBtn = document.getElementById("ask-btn");
+  const answerEl = document.getElementById("answer");
+  const thinkDetailsEl = document.getElementById("think-details");
+  const thinkContentEl = document.getElementById("think-content");
+  const statusEl = document.getElementById("status");
+
+  function modelLabel() {
+    return modelSelectEl.options[modelSelectEl.selectedIndex].textContent;
+  }
+
+  // ponytail: WebLLM's prebuilt config caps both models at a 4096-token
+  // context window, but that's only an artificial override for Qwen3 — its
+  // own compiled model supports up to 40960. Gemma-2's 4096 is architectural
+  // (sliding-window attention baked into the checkpoint) and can't be raised.
+  // So only Qwen3 gets a chatOpts override; Gemma keeps the tighter guard.
+  const CONTEXT_WINDOW_OVERRIDE = {
+    "Qwen3-4B-q4f16_1-MLC": { context_window_size: 8192 },
+  };
+  const MAX_CORPUS_CHARS_BY_MODEL = {
+    "Qwen3-4B-q4f16_1-MLC": 15000,
+    "gemma-2-2b-it-q4f16_1-MLC": 6000,
+  };
+
+  function chatOptsForModel(modelId) {
+    return CONTEXT_WINDOW_OVERRIDE[modelId] || {};
+  }
+
+  function corpusTooLong() {
+    const limit = MAX_CORPUS_CHARS_BY_MODEL[modelSelectEl.value] ?? 6000;
+    return corpusEl.value.length > limit;
+  }
+
+  loadingTitleEl.textContent = `Loading ${modelLabel()}...`;
+  const engine = await CreateMLCEngine(modelSelectEl.value, {
+    initProgressCallback: ({ text, progress }) => {
+      loadingStatus.textContent = text;
+      if (progress !== undefined) progressEl.style.width = (progress * 100) + "%";
+    }
+  }, chatOptsForModel(modelSelectEl.value));
+
+  loadingEl.style.display = "none";
+  appEl.style.display = "block";
+
+  modelSelectEl.addEventListener("change", async () => {
+    modelSelectEl.disabled = true;
+    setControlsEnabled(false);
+    appEl.style.display = "none";
+    loadingEl.style.display = "block";
+    progressEl.style.width = "0%";
+    loadingTitleEl.textContent = `Switching to ${modelLabel()}...`;
+
+    await engine.reload(modelSelectEl.value, chatOptsForModel(modelSelectEl.value));
+
+    loadingEl.style.display = "none";
+    appEl.style.display = "block";
+    modelSelectEl.disabled = false;
+    setControlsEnabled(true);
+  });
+
+  function setControlsEnabled(enabled) {
+    const hasCorpus = corpusEl.value.trim().length > 0;
+    const tooLong = corpusTooLong();
+    corpusWarningEl.style.display = tooLong ? "block" : "none";
+    if (tooLong) {
+      const limit = MAX_CORPUS_CHARS_BY_MODEL[modelSelectEl.value] ?? 6000;
+      corpusWarningEl.textContent = `Document too long for ${modelLabel()}'s context window (${corpusEl.value.length} / ${limit} characters) — shorten it, or switch to Qwen3-4B which allows more.`;
+    }
+    summarizeBtn.disabled = !enabled || !hasCorpus || tooLong;
+    questionEl.disabled = !enabled;
+    askBtn.disabled = !enabled || !hasCorpus || tooLong;
+  }
+
+  corpusEl.addEventListener("input", () => setControlsEnabled(true));
+  setControlsEnabled(true);
+
+  // ponytail: reasoning models (Qwen3) prefix output with a <think>...</think>
+  // block — split it into the accordion instead of dumping it into the answer/summary.
+  function renderReply(reply, targetEl) {
+    const thinkMatch = reply.match(/<think>([\s\S]*?)(<\/think>|$)/);
+    if (!thinkMatch) {
+      targetEl.textContent = reply;
+      return;
+    }
+    thinkDetailsEl.style.display = "block";
+    thinkContentEl.textContent = thinkMatch[1].trim();
+    targetEl.textContent = reply.split(/<\/think>/)[1]?.trim() || "";
+  }
+
+  function resetThink() {
+    thinkDetailsEl.style.display = "none";
+    thinkDetailsEl.open = false;
+    thinkContentEl.textContent = "";
+  }
+
+  async function summarize() {
+    const corpus = corpusEl.value.trim();
+    if (!corpus || corpusTooLong()) return;
+
+    setControlsEnabled(false);
+    statusEl.textContent = "Summarizing...";
+    summaryWrapEl.style.display = "block";
+    summaryEl.textContent = "";
+    resetThink();
+
+    const messages = [
+      {
+        role: "system",
+        content: `Summarize the DOCUMENT below in ONE crisp paragraph, no more than 6-7 lines. Use only information in the document — do not add outside knowledge or opinions.\n\nDOCUMENT:\n${corpus}`
+      },
+      { role: "user", content: "Summarize this document." }
+    ];
+
+    const chunks = await engine.chat.completions.create({ messages, stream: true });
+    let reply = "";
+    for await (const chunk of chunks) {
+      reply += chunk.choices[0]?.delta.content || "";
+      renderReply(reply, summaryEl);
+    }
+
+    statusEl.textContent = "";
+    setControlsEnabled(true);
+  }
+
+  async function ask() {
+    const corpus = corpusEl.value.trim();
+    const question = questionEl.value.trim();
+    if (!corpus || !question || corpusTooLong()) return;
+
+    setControlsEnabled(false);
+    statusEl.textContent = "Thinking...";
+    answerEl.textContent = "";
+    resetThink();
+
+    // ponytail: grounding = the whole pasted document goes straight into the
+    // system prompt (no retrieval needed at this length) with an explicit
+    // instruction to refuse rather than guess, plus a required source quote
+    // so the audience can see the answer traced back to the actual text.
+    const messages = [
+      {
+        role: "system",
+        content: `You are a document assistant. Answer the user's question using ONLY the information in the DOCUMENT below — do not use outside knowledge. If the document does not contain the answer, reply with exactly: "The document doesn't contain this information." When you do answer, end your reply on a new line starting with "Source:" followed by the exact sentence from the document that supports your answer.\n\nDOCUMENT:\n${corpus}`
+      },
+      { role: "user", content: question }
+    ];
+
+    const chunks = await engine.chat.completions.create({ messages, stream: true });
+    let reply = "";
+    for await (const chunk of chunks) {
+      reply += chunk.choices[0]?.delta.content || "";
+      renderReply(reply, answerEl);
+    }
+
+    statusEl.textContent = "";
+    setControlsEnabled(true);
+  }
+
+  summarizeBtn.addEventListener("click", summarize);
+  askBtn.addEventListener("click", ask);
+  questionEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !askBtn.disabled) ask();
+  });
+</script>
+</body>
+</html>

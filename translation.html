@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Translation Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --accent:#2563eb; --dim:#6b7280; --border:#e5e7eb; }
+  * { box-sizing:border-box; }
+  body { font-family:system-ui, -apple-system, sans-serif; background:#f9fafb; margin:0; padding:2rem; color:#111827; }
+  .wrap { max-width:900px; margin:0 auto; }
+  .header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; gap:1rem; }
+  h1 { font-size:1.4rem; margin:0; }
+  #model-select { font-size:0.8rem; padding:0.35rem 0.5rem; border:1px solid var(--border); border-radius:6px; background:white; }
+  #model-select:disabled { opacity:0.5; }
+
+  #loading { text-align:center; padding:3rem 1rem; }
+  #loading h2 { font-size:1.1rem; margin-bottom:0.8rem; color:var(--dim); }
+  .progress-bar { width:320px; max-width:100%; height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin:0 auto 0.8rem; }
+  .progress-fill { height:100%; width:0%; background:var(--accent); transition:width 0.3s; }
+  #loading-status { font-size:0.85rem; color:var(--dim); }
+
+  #app { display:none; }
+  .panes { display:flex; gap:1rem; margin-bottom:1rem; }
+  .pane { flex:1; border:1px solid var(--border); border-radius:10px; background:white; padding:1rem; display:flex; flex-direction:column; }
+  .pane select { font-size:0.85rem; padding:0.4rem; border:1px solid var(--border); border-radius:6px; margin-bottom:0.6rem; }
+  .pane textarea, .pane #output { flex:1; min-height:220px; font-size:0.95rem; line-height:1.5; border:none; resize:none; outline:none; font-family:inherit; }
+  #output { color:#111827; white-space:pre-wrap; }
+  #output:empty::before { content:"Translation appears here..."; color:var(--dim); }
+
+  #think-details { display:none; margin-bottom:0.6rem; border:1px solid var(--border); border-radius:6px; background:#f9fafb; }
+  #think-details summary { padding:0.4rem 0.6rem; font-size:0.8rem; color:var(--dim); cursor:pointer; }
+  #think-content { padding:0 0.6rem 0.6rem; font-size:0.8rem; color:var(--dim); white-space:pre-wrap; max-height:200px; overflow-y:auto; }
+
+  .controls { display:flex; align-items:center; gap:1rem; }
+  #translate-btn { padding:0.6rem 1.4rem; font-size:0.95rem; font-weight:600; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; }
+  #translate-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  #status { font-size:0.85rem; color:var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <h1>On-Device Translation &middot; WebLLM (MLC) + WebGPU</h1>
+    <select id="model-select">
+      <option value="Qwen3-4B-q4f16_1-MLC" selected>Qwen3-4B (multilingual)</option>
+      <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma-2-2B (default)</option>
+    </select>
+  </div>
+
+  <div id="loading">
+    <h2 id="loading-title">Loading model...</h2>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+    <div id="loading-status">Initializing...</div>
+  </div>
+
+  <div id="app">
+    <div class="panes">
+      <div class="pane">
+        <select id="source-lang">
+          <option>English</option>
+          <option>Spanish</option>
+          <option>French</option>
+          <option>German</option>
+          <option>Hindi</option>
+          <option>Japanese</option>
+          <option>Chinese (Simplified)</option>
+          <option>Arabic</option>
+          <option>Portuguese</option>
+          <option>Russian</option>
+        </select>
+        <textarea id="source-text" placeholder="Type or paste text to translate..."></textarea>
+      </div>
+      <div class="pane">
+        <select id="target-lang">
+          <option>English</option>
+          <option selected>Hindi</option>
+          <option>Tamil</option>
+          <option>Spanish</option>
+          <option>French</option>
+          <option>German</option>
+          <option>Japanese</option>
+          <option>Chinese (Simplified)</option>
+          <option>Arabic</option>
+          <option>Portuguese</option>
+          <option>Russian</option>
+        </select>
+        <details id="think-details">
+          <summary>Model reasoning (click to expand)</summary>
+          <div id="think-content"></div>
+        </details>
+        <div id="output"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="translate-btn">Translate</button>
+      <span id="status"></span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+
+  const loadingEl = document.getElementById("loading");
+  const loadingTitleEl = document.getElementById("loading-title");
+  const appEl = document.getElementById("app");
+  const progressEl = document.getElementById("progress");
+  const loadingStatus = document.getElementById("loading-status");
+  const modelSelectEl = document.getElementById("model-select");
+  const sourceLangEl = document.getElementById("source-lang");
+  const targetLangEl = document.getElementById("target-lang");
+  const sourceTextEl = document.getElementById("source-text");
+  const outputEl = document.getElementById("output");
+  const thinkDetailsEl = document.getElementById("think-details");
+  const thinkContentEl = document.getElementById("think-content");
+  const translateBtn = document.getElementById("translate-btn");
+  const statusEl = document.getElementById("status");
+
+  function modelLabel() {
+    return modelSelectEl.options[modelSelectEl.selectedIndex].textContent;
+  }
+
+  // ponytail: Qwen3 is the default — Gemma-2-2B translated Tamil poorly; Qwen3
+  // is trained on ~119 languages incl. Tamil per its technical report. The
+  // switcher lets you show that gap live rather than just claiming it.
+  loadingTitleEl.textContent = `Loading ${modelLabel()}...`;
+  const engine = await CreateMLCEngine(modelSelectEl.value, {
+    initProgressCallback: ({ text, progress }) => {
+      loadingStatus.textContent = text;
+      if (progress !== undefined) progressEl.style.width = (progress * 100) + "%";
+    }
+  });
+
+  loadingEl.style.display = "none";
+  appEl.style.display = "block";
+
+  modelSelectEl.addEventListener("change", async () => {
+    modelSelectEl.disabled = true;
+    translateBtn.disabled = true;
+    appEl.style.display = "none";
+    loadingEl.style.display = "block";
+    progressEl.style.width = "0%";
+    loadingTitleEl.textContent = `Switching to ${modelLabel()}...`;
+
+    await engine.reload(modelSelectEl.value);
+
+    loadingEl.style.display = "none";
+    appEl.style.display = "block";
+    modelSelectEl.disabled = false;
+    translateBtn.disabled = false;
+  });
+
+  // ponytail: reasoning models (Qwen3) prefix output with a <think>...</think>
+  // block — split it into the accordion instead of dumping it into the answer.
+  function renderReply(reply) {
+    const thinkMatch = reply.match(/<think>([\s\S]*?)(<\/think>|$)/);
+    if (!thinkMatch) {
+      outputEl.textContent = reply;
+      return;
+    }
+    thinkDetailsEl.style.display = "block";
+    thinkContentEl.textContent = thinkMatch[1].trim();
+    outputEl.textContent = reply.split(/<\/think>/)[1]?.trim() || "";
+  }
+
+  async function translate() {
+    const text = sourceTextEl.value.trim();
+    if (!text) return;
+
+    translateBtn.disabled = true;
+    statusEl.textContent = "Translating...";
+    outputEl.textContent = "";
+    thinkDetailsEl.style.display = "none";
+    thinkDetailsEl.open = false;
+    thinkContentEl.textContent = "";
+
+    const messages = [
+      {
+        role: "system",
+        content: `You are a translation engine. Translate the user's text from ${sourceLangEl.value} to ${targetLangEl.value}. Output ONLY the translated text — no explanations, no quotes, no notes.`
+      },
+      { role: "user", content: text }
+    ];
+
+    const chunks = await engine.chat.completions.create({ messages, stream: true });
+    let reply = "";
+    for await (const chunk of chunks) {
+      reply += chunk.choices[0]?.delta.content || "";
+      renderReply(reply);
+    }
+
+    statusEl.textContent = "";
+    translateBtn.disabled = false;
+  }
+
+  translateBtn.addEventListener("click", translate);
+</script>
+</body>
+</html>
